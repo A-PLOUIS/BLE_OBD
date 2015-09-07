@@ -18,13 +18,14 @@ import android.view.MenuItem;
 import android.widget.Toast;
 
 import com.chabintech.ble_obd.dialog.BLEDevicesDialog;
+import com.chabintech.ble_obd.fragments.MainFragment;
 
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.OnFragmentInteractionListener {
+public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.OnFragmentInteractionListener, MainFragment.BLEActivity {
     // Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 10000;
     private static final String LOG_SCAN = "BLEScan";
@@ -109,7 +110,7 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
         devices = new HashSet<>();
 
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        scanLeDevice(true);
+        getFragmentManager().beginTransaction().replace(R.id.container, MainFragment.newInstance());
     }
 
     @Override
@@ -134,7 +135,8 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
         return super.onOptionsItemSelected(item);
     }
 
-    private void scanLeDevice(final boolean enable) {
+    @Override
+    public void scanLeDevice(final boolean enable) {
         if (enable) {
             // Stops scanning after a pre-defined scan period.
             mHandler.postDelayed(new Runnable() {
