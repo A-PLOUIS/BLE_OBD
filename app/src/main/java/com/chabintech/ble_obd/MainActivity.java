@@ -19,8 +19,10 @@ import android.widget.Toast;
 
 import com.chabintech.ble_obd.dialog.BLEDevicesDialog;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.OnFragmentInteractionListener {
     // Stops scanning after 10 seconds.
@@ -28,20 +30,34 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
     private static final String LOG_SCAN = "BLEScan";
     private static final String LOG_GATT = "BLE_Gatt";
 
+    //Bluetooth UUID
+    private static final UUID mServiceUUID = UUID.fromString("FFF0");
+    private static final UUID mWriteUUID = UUID.fromString("FFF1");
+    private static final UUID mReadUUID = UUID.fromString("FFF2");
+
+    private String mCurrentCommand;
+
 
     private BluetoothAdapter mBluetoothAdapter;
-    private boolean mScanning, mIsConnected;
+    private boolean mScanning, mIsConnected, mWaitingForResult;
     private Handler mHandler;
     private BluetoothGatt mBluetoothGatt;
+
     private BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicRead(gatt, characteristic, status);
+
+            Log.d(LOG_GATT, "Characteristic " + characteristic.getUuid().toString() + " value : " + Arrays.toString(characteristic.getValue()));
+            mWaitingForResult = false;
         }
 
         @Override
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
-            super.onCharacteristicWrite(gatt, characteristic, status);
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.d(LOG_GATT, "Characteristic " + characteristic.getUuid().toString() + " write : " + Arrays.toString(characteristic.getValue()));
+                readOBDResult();
+            }
         }
 
         @Override
@@ -65,6 +81,8 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
                 for (BluetoothGattService service : gatt.getServices()) {
                     Log.i(LOG_GATT, "UUID : " + service.getUuid().toString());
                 }
+
+                initialiseOBDInterface();
             }
         }
     };
@@ -156,5 +174,44 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
         }
         mBluetoothGatt.close();
         mBluetoothGatt = null;
+    }
+
+    private void initialiseOBDInterface() {
+        writeOBDCommand("AT Z");
+        writeOBDCommand("AT E0");
+        writeOBDCommand("AT ST " + Integer.toHexString(0xFF & 62));
+        writeOBDCommand("AT SP 0");
+    }
+
+    private void writeOBDCommand(String p_command) {
+        if (mIsConnected) {
+            while (mWaitingForResult) {
+                try {
+                    this.wait(50);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            BluetoothGattCharacteristic writeChar = mBluetoothGatt.getService(mServiceUUID)
+                    .getCharacteristic(mWriteUUID);
+            byte[] data = (p_command + '\r').getBytes();
+
+            writeChar.setValue(data);
+            mBluetoothGatt.writeCharacteristic(writeChar);
+            mWaitingForResult = true;
+            mCurrentCommand = p_command;
+        } else {
+            Toast.makeText(getBaseContext(), "Can't write OBD Command\nNot Connected", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void readOBDResult() {
+        if (mIsConnected) {
+            BluetoothGattCharacteristic readChar = mBluetoothGatt.getService(mServiceUUID)
+                    .getCharacteristic(mReadUUID);
+            mBluetoothGatt.readCharacteristic(readChar);
+        } else {
+            Toast.makeText(getBaseContext(), "Can't read OBD Result\nNot Connected", Toast.LENGTH_SHORT).show();
+        }
     }
 }
