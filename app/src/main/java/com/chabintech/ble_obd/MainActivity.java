@@ -3,6 +3,10 @@ package com.chabintech.ble_obd;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.BluetoothProfile;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -22,12 +26,48 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
     // Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 10000;
     private static final String LOG_SCAN = "BLEScan";
+    private static final String LOG_GATT = "BLE_Gatt";
 
 
     private BluetoothAdapter mBluetoothAdapter;
-    private boolean mScanning;
+    private boolean mScanning, mIsConnected;
     private Handler mHandler;
     private BluetoothGatt mBluetoothGatt;
+    private BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
+        @Override
+        public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            super.onCharacteristicRead(gatt, characteristic, status);
+        }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            super.onCharacteristicWrite(gatt, characteristic, status);
+        }
+
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                mIsConnected = true;
+                Log.i(LOG_GATT, "******Connected to GATT server*****");
+                Log.i(LOG_GATT, "Attempting to start service discovery:" +
+                        mBluetoothGatt.discoverServices());
+
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                mIsConnected = false;
+                Log.i(LOG_GATT, "******Disconnected from GATT server******");
+            }
+        }
+
+        @Override
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                Log.i(LOG_GATT, "******Services discovered*****");
+                for (BluetoothGattService service : gatt.getServices()) {
+                    Log.i(LOG_GATT, "UUID : " + service.getUuid().toString());
+                }
+            }
+        }
+    };
 
     private Set<BluetoothDevice> devices;
     // Device scan callback.
@@ -107,6 +147,14 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
 
     @Override
     public void connectToBLEDevice(BluetoothDevice p_device) {
+        mBluetoothGatt = p_device.connectGatt(this, false, mGattCallback);
+    }
 
+    public void disconnectFromBLEDevice() {
+        if (mBluetoothGatt == null) {
+            return;
+        }
+        mBluetoothGatt.close();
+        mBluetoothGatt = null;
     }
 }
