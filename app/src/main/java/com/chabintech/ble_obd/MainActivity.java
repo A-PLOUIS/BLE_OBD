@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothProfile;
 import android.content.pm.PackageManager;
@@ -37,19 +38,15 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
     //Bluetooth UUID
     private static final UUID mServiceUUID = UUID.fromString("0000FFF0-0000-1000-8000-00805F9B34FB");
     private static final UUID mWriteUUID = UUID.fromString("0000FFF2-0000-1000-8000-00805F9B34FB");
-    private static final UUID mReadUUID = UUID.fromString("0000FFF1-0000-1000-8000-00805F9B34FB");
-
+    private static final UUID mNotifyUUID = UUID.fromString("0000FFF1-0000-1000-8000-00805F9B34FB");
+    private static final UUID CHARACTERISTIC_UPDATE_NOTIFICATION_DESCRIPTOR_UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
     private DialogFragment mDevicesDialog;
     private ProgressDialog mWaitingDialog;
-
     private String mCurrentCommand;
-
-
     private BluetoothAdapter mBluetoothAdapter;
     private boolean mScanning, mIsConnected, mWaitingForResult;
     private Handler mHandler;
     private BluetoothGatt mBluetoothGatt;
-
     private BluetoothGattCallback mGattCallback = new BluetoothGattCallback() {
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
@@ -57,7 +54,7 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
                 Log.d(LOG_GATT, "Characteristic " + characteristic.getUuid().toString() + " value : " + Arrays.toString(characteristic.getValue()));
                 LogUtils.logInfo("Read characteristic value " + Arrays.toString(characteristic.getValue()) + " in FFF1");
             } else {
-                LogUtils.logInfo("Couldnt read characteristic " + mReadUUID.toString());
+                LogUtils.logInfo("Couldnt read characteristic " + mNotifyUUID.toString());
             }
 
             mWaitingForResult = false;
@@ -68,7 +65,6 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 LogUtils.logInfo("Command wroten");
                 Log.d(LOG_GATT, "Characteristic " + characteristic.getUuid().toString() + " write : " + Arrays.toString(characteristic.getValue()));
-                readOBDResult();
             }
         }
 
@@ -99,12 +95,21 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
                     Log.i(LOG_GATT, "UUID : " + service.getUuid().toString());
                     LogUtils.logInfo(service.getUuid().toString());
                 }
+                suscribeToNotification();
+            }
+        }
 
+        @Override
+        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                LogUtils.logInfo("Suscribede");
                 initialiseOBDInterface();
+            } else {
+
+                LogUtils.logInfo("Failed Suscribede");
             }
         }
     };
-
     private Set<BluetoothDevice> devices;
     // Device scan callback.
     private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
@@ -215,6 +220,16 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
         writeOBDCommand("AT SP 0");*/
     }
 
+    private void suscribeToNotification() {
+        //subscribe to notification
+        BluetoothGattCharacteristic characteristic = mBluetoothGatt.getService(mServiceUUID).getCharacteristic(mNotifyUUID);
+        mBluetoothGatt.setCharacteristicNotification(characteristic, true);
+        BluetoothGattDescriptor descriptor = characteristic.getDescriptor(
+                CHARACTERISTIC_UPDATE_NOTIFICATION_DESCRIPTOR_UUID);
+        descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
+        mBluetoothGatt.writeDescriptor(descriptor);
+    }
+
     private void writeOBDCommand(String p_command) {
         if (mIsConnected) {
 //            while (mWaitingForResult) {
@@ -235,17 +250,6 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
             mCurrentCommand = p_command;
         } else {
             Toast.makeText(this, "Can't write OBD Command\nNot Connected", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void readOBDResult() {
-        if (mIsConnected) {
-            BluetoothGattCharacteristic readChar = mBluetoothGatt.getService(mServiceUUID)
-                    .getCharacteristic(mReadUUID);
-            LogUtils.logInfo("About to read result");
-            mBluetoothGatt.readCharacteristic(readChar);
-        } else {
-            Toast.makeText(this, "Can't read OBD Result\nNot Connected", Toast.LENGTH_SHORT).show();
         }
     }
 
