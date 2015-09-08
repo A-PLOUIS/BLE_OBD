@@ -32,9 +32,9 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
     private static final String LOG_GATT = "BLE_Gatt";
 
     //Bluetooth UUID
-    private static final UUID mServiceUUID = UUID.fromString("FFF0");
-    private static final UUID mWriteUUID = UUID.fromString("FFF1");
-    private static final UUID mReadUUID = UUID.fromString("FFF2");
+    private static final UUID mServiceUUID = UUID.fromString("0000FFF0-0000-1000-8000-00805F9B34FB");
+    private static final UUID mWriteUUID = UUID.fromString("0000FFF1-0000-1000-8000-00805F9B34FB");
+    private static final UUID mReadUUID = UUID.fromString("0000FFF2-0000-1000-8000-00805F9B34FB");
 
     private String mCurrentCommand;
 
@@ -102,15 +102,16 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        getSupportFragmentManager().beginTransaction().replace(R.id.container, MainFragment.newInstance()).commit();
 
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Toast.makeText(this, R.string.ble_not_supported, Toast.LENGTH_SHORT).show();
             finish();
         }
         devices = new HashSet<>();
+        mHandler = new Handler();
 
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        getFragmentManager().beginTransaction().replace(R.id.container, MainFragment.newInstance());
     }
 
     @Override
