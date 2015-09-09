@@ -18,10 +18,10 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.Toast;
 
 import com.chabintech.ble_obd.dialog.BLEDevicesDialog;
-import com.chabintech.ble_obd.fragments.MainFragment;
 import com.chabintech.ble_obd.utils.LogUtils;
 
 import java.util.Arrays;
@@ -29,7 +29,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.OnFragmentInteractionListener, MainFragment.BLEActivity {
+public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.OnFragmentInteractionListener {
     // Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 10000;
     private static final String LOG_SCAN = "BLEScan";
@@ -82,6 +82,7 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
                 Log.i(LOG_GATT, "Attempting to start service discovery");
                 mBluetoothGatt.discoverServices();
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                disconnectFromBLEDevice();
                 mIsConnected = false;
                 Log.i(LOG_GATT, "******Disconnected from GATT server******");
             }
@@ -102,11 +103,12 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
         @Override
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                LogUtils.logInfo("Suscribede");
-                initialiseOBDInterface();
+                if (descriptor.getValue() == BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) {
+                    LogUtils.logInfo("Subscribed");
+                    initialiseOBDInterface();
+                }
             } else {
-
-                LogUtils.logInfo("Failed Suscribede");
+                LogUtils.logInfo("Failed Subscribed");
             }
         }
     };
@@ -123,13 +125,20 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        getSupportFragmentManager().beginTransaction().replace(R.id.container, MainFragment.newInstance()).commit();
-
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Toast.makeText(this, R.string.ble_not_supported, Toast.LENGTH_SHORT).show();
             finish();
         }
+
+
+        setContentView(R.layout.activity_main);
+        findViewById(R.id.btn_find_devices).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                scanLeDevice(true);
+            }
+        });
+
         devices = new HashSet<>();
         mHandler = new Handler();
         mWaitingDialog = new ProgressDialog(this);
@@ -162,7 +171,6 @@ public class MainActivity extends AppCompatActivity implements BLEDevicesDialog.
         return super.onOptionsItemSelected(item);
     }
 
-    @Override
     public void scanLeDevice(final boolean enable) {
         if (enable) {
             // Stops scanning after a pre-defined scan period.
